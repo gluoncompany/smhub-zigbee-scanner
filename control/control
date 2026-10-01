@@ -1,0 +1,7 @@
+Package: zigbee-scanner
+Version: 1.1.0-1
+Architecture: all
+Maintainer: local
+Description: Zigbee channel scanner - detects nearby Zigbee networks, measures channel energy and recommends the best channel
+Priority: optional
+Required-OS-Version: 1.0.0

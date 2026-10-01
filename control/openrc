@@ -1,0 +1,19 @@
+#!/sbin/openrc-run
+
+description="Zigbee Scanner service"
+
+supervisor="supervise-daemon"
+command="/usr/bin/python3"
+command_args="/opt/zigbee-scanner/server.py"
+pidfile="/var/run/zigbee-scanner.pid"
+output_log="/var/log/zigbee-scanner.log"
+error_log="/var/log/zigbee-scanner.log"
+
+export ZS_PORT=8099
+export ZS_DATA=/opt/zigbee-scanner/data
+
+depend() {
+	need localmount net
+	after api-ready
+	provide zigbee-scanner
+}

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+. /usr/lib/smhub/service-helpers.sh
+
+pkg_service_remove "zigbee-scanner" "$1"
+
+if [ "$1" = "remove" ]; then
+    rm -f /opt/share/services/zigbee-scanner.autostart
+fi
+
+exit 0
