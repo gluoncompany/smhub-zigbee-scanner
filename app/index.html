@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zigbee Scanner</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--fg:#1d2330;--mut:#6b7385;--line:#e3e6ec;--good:#2e9d5b;--ok:#c9a227;--bad:#d9534f;--acc:#2f6fdf;--net:#8a5cd6}
+@media (prefers-color-scheme:dark){:root{--bg:#1e1f22;--card:#27282c;--fg:#e8eaed;--mut:#9aa0ab;--line:#3a3c42;--acc:#5b8ff0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:15px;margin:0 0 12px}
+.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+select{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px}
+.lang{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-shrink:0}
+.lang button{background:transparent;color:var(--mut);border-radius:0;padding:6px 10px;font-size:12px;font-weight:600}
+.lang button[aria-pressed="true"]{background:var(--acc);color:#fff}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;flex:1;min-width:160px}
+.bar>div{height:100%;background:var(--acc);width:0;transition:width .4s}
+.msg{color:var(--mut)}
+.err{color:var(--bad);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:12px}
+.tile .k{color:var(--mut);font-size:12px}
+.tile .v{font-size:26px;font-weight:700}
+.tile .n{color:var(--mut);font-size:12px}
+.chart{display:grid;grid-template-columns:62px 1fr 150px;gap:6px 10px;align-items:center}
+.ch{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ch.cur::after{content:" ●";color:var(--acc)}
+.track{position:relative;height:18px;background:var(--line);border-radius:4px}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.peak{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--fg);opacity:.55;border-radius:2px}
+.val{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px;white-space:nowrap}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:9px;background:var(--net);color:#fff;margin-left:4px}
+.wifi{display:grid;grid-template-columns:62px 1fr 150px;gap:10px;margin-top:10px;font-size:11px;color:var(--mut)}
+.wifistrip{position:relative;height:18px}
+.wifistrip span{position:absolute;top:0;height:18px;border:1px dashed var(--mut);border-radius:9px;text-align:center;line-height:16px}
+table{width:100%;min-width:620px;border-collapse:collapse}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:12px;margin-bottom:10px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.scroll{overflow-x:auto}
+.foot{font-size:12px;margin:10px 0 0}
+@media (max-width:640px){.chart,.wifi{grid-template-columns:54px 1fr 96px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1>Zigbee Scanner</h1>
+    <p class="sub" data-i18n="subtitle"></p>
+  </div>
+  <div class="lang" role="group" aria-label="Language">
+    <button data-lang="es">ES</button><button data-lang="en">EN</button>
+  </div>
+</header>
+
+<div class="card">
+  <div class="row">
+    <button id="go" data-i18n="scan"></button>
+    <label class="msg"><span data-i18n="passes"></span> <select id="passes"><option>3</option><option selected>5</option><option>10</option></select></label>
+    <div class="bar"><div id="pbar"></div></div>
+  </div>
+  <p id="msg" class="msg" style="margin:10px 0 0"></p>
+</div>
+
+<div id="res" hidden>
+  <div class="card">
+    <div class="tiles">
+      <div class="tile"><div class="k" data-i18n="t_best"></div><div class="v" id="best">–</div><div class="n" id="bestn"></div></div>
+      <div class="tile"><div class="k" data-i18n="t_bestp"></div><div class="v" id="bestp">–</div><div class="n" id="bestpn"></div></div>
+      <div class="tile"><div class="k" data-i18n="t_own"></div><div class="v" id="own">–</div><div class="n" id="ownn"></div></div>
+      <div class="tile"><div class="k" data-i18n="t_nets"></div><div class="v" id="nnet">–</div><div class="n" id="when"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="h_energy"></h2>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span><span data-i18n="l_clean"></span></span>
+      <span><span class="dot" style="background:var(--ok)"></span><span data-i18n="l_ok"></span></span>
+      <span><span class="dot" style="background:var(--bad)"></span><span data-i18n="l_bad"></span></span>
+      <span><span class="dot" style="background:var(--fg);opacity:.55"></span><span data-i18n="l_peak"></span></span>
+      <span><span class="tag" style="margin:0" data-i18n="l_tag"></span> <span data-i18n="l_other"></span></span>
+      <span style="color:var(--acc)">● <span data-i18n="l_current"></span></span>
+    </div>
+    <div class="chart" id="chart"></div>
+    <div class="wifi"><div>Wi-Fi</div><div class="wifistrip" id="wifi"></div><div></div></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="h_rank"></h2>
+    <div class="scroll"><table><thead><tr><th>#</th><th data-i18n="c_channel"></th><th data-i18n="c_score"></th><th data-i18n="c_avg"></th><th data-i18n="c_peak"></th><th data-i18n="c_notes"></th></tr></thead><tbody id="rank"></tbody></table></div>
+    <p class="msg foot" data-i18n="rank_foot"></p>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="h_nets"></h2>
+    <div class="scroll"><table><thead><tr><th data-i18n="c_channel"></th><th>PAN</th><th>Extended PAN</th><th>RSSI</th><th>LQI</th><th data-i18n="c_join"></th><th data-i18n="c_beacons"></th></tr></thead><tbody id="nets"></tbody></table></div>
+    <p class="msg foot" data-i18n="nets_foot"></p>
+  </div>
+</div>
+</main>
+<script>
+const I18N = {
+  es: {
+    subtitle: 'Detecta redes Zigbee cercanas, mide el ruido por canal y recomienda el mejor canal. Durante el escaneo se para Zigbee2MQTT y se vuelve a arrancar al terminar.',
+    scan: 'Escanear', passes: 'Pasadas',
+    t_best: 'Canal recomendado', t_bestp: 'Mejor entre 11 / 15 / 20 / 25 sin otra red', t_own: 'Tu red (Zigbee2MQTT)', t_nets: 'Redes Zigbee detectadas',
+    h_energy: 'Energía por canal', l_clean: 'limpio (< −75 dBm)', l_ok: 'aceptable', l_bad: 'saturado (> −55 dBm)', l_peak: 'pico',
+    l_tag: 'red', l_other: 'otra red Zigbee', l_current: 'canal actual',
+    h_rank: 'Ranking de canales (mejor primero)', c_channel: 'Canal', c_score: 'Puntos', c_avg: 'Media', c_peak: 'Pico', c_notes: 'Observaciones',
+    rank_foot: 'Puntos = ruido medio + 25 % del pico + 8 por cada red Zigbee en el canal + 4 si no es 11/15/20/25 (+2 en el 26). Menos es mejor. Mide a distintas horas antes de cambiar: cambiar de canal puede obligar a re-emparejar dispositivos.',
+    h_nets: 'Redes Zigbee detectadas', c_join: 'Emparejar', c_beacons: 'Balizas',
+    nets_foot: 'Solo responden coordinadores y routers encendidos. Tu propia red no aparece porque su coordinador está parado durante el escaneo.',
+    none_free: 'ninguno libre', no_data: 'sin datos', no_nets: 'Ninguna red detectada', open: 'abierta', closed: 'cerrada', current: 'actual', ok: 'ok',
+    desc: 'media {0} dBm · pico {1} dBm', own_rank: 'puesto {0} de {1} · PAN {2}', when: '{0} · {1} pasadas',
+    nets_tag: n => n === 1 ? '1 red' : n + ' redes',
+    track: 'mín {0} · media {1} · pico {2} dBm', wifi_ch: 'canal {0}',
+    status: 'Radio: {0} @ {1} · Zigbee2MQTT {2}', running: 'en marcha', stopped: 'parado', restarted: ' (reiniciado tras el escaneo)',
+    n_networks: n => n === 1 ? '1 red Zigbee en este canal' : n + ' redes Zigbee en este canal',
+    n_nonstandard: 'no estándar: algunos dispositivos solo usan 11/15/20/25', n_ch26: 'potencia limitada en algunos dispositivos',
+    p_preparing: 'Preparando', p_stopping: 'Parando Zigbee2MQTT', p_connecting: 'Conectando con la radio', p_networks: 'Buscando otras redes Zigbee ({0}/{1})',
+    p_energy: 'Midiendo energía ({0}/{1})', p_done: 'Terminado', p_starting: 'Arrancando Zigbee2MQTT',
+    err_no_response: 'La radio no responde al comando {0}', err_no_rstack: 'La radio no responde. ¿Sigue Zigbee2MQTT usando el puerto?',
+    err_scan_rejected: 'La radio rechazó el escaneo (estado {0})', err_stop: 'No se pudo parar Zigbee2MQTT: {0}',
+    err_start: 'El escaneo terminó, pero Zigbee2MQTT no arrancó: {0}', err_busy: 'Ya hay un escaneo en curso', err_generic: 'Error: {0}'
+  },
+  en: {
+    subtitle: 'Detects nearby Zigbee networks, measures noise on each channel and recommends the best channel. Zigbee2MQTT is stopped during the scan and restarted when it finishes.',
+    scan: 'Scan', passes: 'Passes',
+    t_best: 'Recommended channel', t_bestp: 'Best of 11 / 15 / 20 / 25 with no other network', t_own: 'Your network (Zigbee2MQTT)', t_nets: 'Zigbee networks found',
+    h_energy: 'Energy per channel', l_clean: 'clean (< −75 dBm)', l_ok: 'acceptable', l_bad: 'congested (> −55 dBm)', l_peak: 'peak',
+    l_tag: 'net', l_other: 'other Zigbee network', l_current: 'current channel',
+    h_rank: 'Channel ranking (best first)', c_channel: 'Channel', c_score: 'Score', c_avg: 'Average', c_peak: 'Peak', c_notes: 'Notes',
+    rank_foot: 'Score = average noise + 25% of the peak + 8 per Zigbee network on the channel + 4 if not 11/15/20/25 (+2 on 26). Lower is better. Measure at different times before switching: changing channel may require re-pairing devices.',
+    h_nets: 'Zigbee networks found', c_join: 'Pairing', c_beacons: 'Beacons',
+    nets_foot: 'Only powered coordinators and routers respond. Your own network is not listed because its coordinator is stopped during the scan.',
+    none_free: 'none free', no_data: 'no data', no_nets: 'No networks found', open: 'open', closed: 'closed', current: 'current', ok: 'ok',
+    desc: 'average {0} dBm · peak {1} dBm', own_rank: 'rank {0} of {1} · PAN {2}', when: '{0} · {1} passes',
+    nets_tag: n => n === 1 ? '1 net' : n + ' nets',
+    track: 'min {0} · average {1} · peak {2} dBm', wifi_ch: 'channel {0}',
+    status: 'Radio: {0} @ {1} · Zigbee2MQTT {2}', running: 'running', stopped: 'stopped', restarted: ' (restarted after the scan)',
+    n_networks: n => n === 1 ? '1 Zigbee network on this channel' : n + ' Zigbee networks on this channel',
+    n_nonstandard: 'non-standard: some devices only use 11/15/20/25', n_ch26: 'reduced power on some devices',
+    p_preparing: 'Preparing', p_stopping: 'Stopping Zigbee2MQTT', p_connecting: 'Connecting to the radio', p_networks: 'Looking for other Zigbee networks ({0}/{1})',
+    p_energy: 'Measuring energy ({0}/{1})', p_done: 'Done', p_starting: 'Starting Zigbee2MQTT',
+    err_no_response: 'The radio does not respond to command {0}', err_no_rstack: 'The radio does not respond. Is Zigbee2MQTT still using the port?',
+    err_scan_rejected: 'The radio rejected the scan (status {0})', err_stop: 'Could not stop Zigbee2MQTT: {0}',
+    err_start: 'The scan finished, but Zigbee2MQTT did not start: {0}', err_busy: 'A scan is already running', err_generic: 'Error: {0}'
+  }
+};
+
+function pickLang() {
+  try { const s = localStorage.getItem('zs-lang'); if (I18N[s]) return s; } catch (e) {}
+  return (navigator.language || 'es').toLowerCase().startsWith('es') ? 'es' : 'en';
+}
+let lang = pickLang();
+const t = (key, ...a) => {
+  const v = (I18N[lang] || I18N.es)[key];
+  if (v === undefined) return key;
+  return typeof v === 'function' ? v(...a) : v.replace(/\{(\d)\}/g, (m, i) => a[i] !== undefined ? a[i] : m);
+};
+const tm = m => m && m.key ? t(m.key, ...(m.args || [])) : (m || '');
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const lo = -100, hi = -20;
+const pct = v => Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+const color = v => v < -75 ? 'var(--good)' : v > -55 ? 'var(--bad)' : 'var(--ok)';
+const freq = ch => 2405 + 5 * (ch - 11);
+let polling = null, lastResult = null, lastStatus = null;
+
+function applyStatic() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+}
+
+function render(r) {
+  $('res').hidden = false;
+  const byCh = {}; r.channels.forEach(c => byCh[c.channel] = c);
+  const own = r.own_network && r.own_network.channel;
+  const desc = ch => { const c = byCh[ch]; return c ? t('desc', Math.round(c.avg), c.max) : ''; };
+  const note = (code, c) => code === 'n_networks' ? t(code, c.networks) : t(code);
+  $('best').textContent = r.best ? 'CH' + r.best : '–'; $('bestn').textContent = r.best ? desc(r.best) : '';
+  $('bestp').textContent = r.best_preferred ? 'CH' + r.best_preferred : '–'; $('bestpn').textContent = r.best_preferred ? desc(r.best_preferred) : t('none_free');
+  $('own').textContent = own ? 'CH' + own : '–';
+  $('ownn').textContent = own ? t('own_rank', r.ranking.indexOf(own) + 1, r.ranking.length, r.own_network.pan_id) : '';
+  $('nnet').textContent = r.networks.length;
+  $('when').textContent = t('when', new Date(r.timestamp * 1000).toLocaleString(lang), r.passes);
+
+  $('chart').innerHTML = r.channels.map(c => {
+    if (!c.samples) return `<div class="ch">CH${c.channel}</div><div class="track"></div><div class="val">${t('no_data')}</div>`;
+    const tag = c.networks ? `<span class="tag">${t('nets_tag', c.networks)}</span>` : '';
+    return `<div class="ch${c.channel === own ? ' cur' : ''}">CH${c.channel}</div>
+      <div class="track" title="${t('track', c.min, c.avg, c.max)}">
+        <div class="fill" style="width:${pct(c.avg)}%;background:${color(c.avg)}"></div>
+        <div class="peak" style="left:calc(${pct(c.max)}% - 1px)"></div></div>
+      <div class="val">${Math.round(c.avg)} / ${c.max} dBm${tag}</div>`;
+  }).join('');
+
+  // Wi-Fi 1/6/11 (20 MHz) mapped onto the Zigbee channel axis
+  const f0 = freq(11) - 2.5, f1 = freq(26) + 2.5;
+  $('wifi').innerHTML = [[1, 2412], [6, 2437], [11, 2462]].map(([n, f]) => {
+    const a = Math.max(f0, f - 10), b = Math.min(f1, f + 10);
+    return `<span style="left:${(a - f0) / (f1 - f0) * 100}%;width:${(b - a) / (f1 - f0) * 100}%">${t('wifi_ch', n)}</span>`;
+  }).join('');
+
+  $('rank').innerHTML = r.ranking.map((ch, i) => {
+    const c = byCh[ch];
+    const notes = (c.notes || []).map(n => note(n, c)).join('; ') || t('ok');
+    return `<tr><td>${i + 1}</td><td><b>CH${ch}</b>${ch === own ? ` <span style="color:var(--acc)">(${t('current')})</span>` : ''}</td><td>${c.score}</td><td>${Math.round(c.avg)}</td><td>${c.max}</td><td>${notes}</td></tr>`;
+  }).join('');
+
+  $('nets').innerHTML = r.networks.length ? r.networks.map(n =>
+    `<tr><td>CH${n.channel}</td><td>${esc(n.pan_id)}</td><td><code>${esc(n.ext_pan_id)}</code></td><td>${n.rssi} dBm</td><td>${n.lqi}</td><td>${t(n.permit_join ? 'open' : 'closed')}</td><td>${n.beacons}</td></tr>`).join('')
+    : `<tr><td colspan="7" class="msg">${t('no_nets')}</td></tr>`;
+}
+
+function showStatus(s) {
+  $('pbar').style.width = (s.running ? s.progress : 0) + '%';
+  $('go').disabled = s.running;
+  if (s.running) { $('msg').className = 'msg'; $('msg').textContent = tm(s.message) + '…'; return; }
+  if (s.error) { $('msg').className = 'err'; $('msg').textContent = tm(s.error); return; }
+  $('msg').className = 'msg';
+  $('msg').textContent = t('status', s.serial[0], s.serial[1], t(s.z2m_running ? 'running' : 'stopped')) + (s.z2m_restarted ? t('restarted') : '');
+}
+
+async function loadResult() {
+  const r = await fetch('api/result');
+  if (r.ok) { lastResult = await r.json(); render(lastResult); }
+}
+
+async function status() {
+  const s = await (await fetch('api/status')).json();
+  lastStatus = s;
+  showStatus(s);
+  if (s.running) { if (!polling) polling = setInterval(status, 1000); return; }
+  if (polling) { clearInterval(polling); polling = null; await loadResult(); }
+}
+
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem('zs-lang', l); } catch (e) {}
+  applyStatic();
+  if (lastResult) render(lastResult);
+  if (lastStatus) showStatus(lastStatus);
+}
+
+document.querySelectorAll('.lang button').forEach(b => b.onclick = () => setLang(b.dataset.lang));
+
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  const r = await fetch('api/scan', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({passes: +$('passes').value})});
+  if (!r.ok) { $('msg').className = 'err'; $('msg').textContent = tm((await r.json()).error); }
+  status();
+};
+
+applyStatic(); loadResult(); status();
+</script>
+</body>
+</html>
